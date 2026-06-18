@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1C1E22" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Arbetstid" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <title>Arbetstid</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #1C1E22;
+      --card:    #272A30;
+      --cell:    #1C1E22;
+      --border:  #31363E;
+      --green:   #4ADE80;
+      --red:     #F87171;
+      --amber:   #FBBF24;
+      --text:    #E8EAF0;
+      --muted:   #6B7280;
+      --subtle:  #9CA3AF;
+      --hover:   #1A2E1F;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: env(safe-area-inset-top, 32px) 16px env(safe-area-inset-bottom, 32px);
+      padding-top: max(env(safe-area-inset-top), 32px);
+      padding-bottom: max(env(safe-area-inset-bottom), 48px);
+      overflow-x: hidden;
+    }
+
+    .wrap { width: 100%; max-width: 680px; }
+
+    /* Header */
+    .header { margin-bottom: 28px; }
+    .header-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .label-sm {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--green);
+    }
+    .save-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 1px;
+      color: transparent;
+      transition: color 0.3s;
+    }
+    .save-status.saving { color: var(--amber); }
+    .save-status.saved  { color: var(--green); }
+    .save-status.error  { color: var(--red); }
+
+    .total-amount {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(36px, 10vw, 52px);
+      font-weight: 700;
+      color: var(--green);
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+    .total-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--muted); margin-top: 8px;
+    }
+
+    /* Rate input */
+    .rate-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .rate-row label { font-size: 13px; color: var(--subtle); white-space: nowrap; }
+    .rate-row input {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px; padding: 8px 12px; width: 110px; outline: none;
+    }
+    .rate-row span { color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+
+    /* Calendar card */
+    .cal-card {
+      background: var(--card); border-radius: 16px; padding: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .month-nav {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 18px;
+    }
+    .nav-btn {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--subtle); font-size: 22px; width: 38px; height: 38px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; -webkit-tap-highlight-color: transparent;
+    }
+    .month-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px; font-weight: 600; letter-spacing: 1px;
+    }
+
+    .day-headers {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 3px; margin-bottom: 3px;
+    }
+    .day-header {
+      text-align: center; font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 1px; color: var(--muted);
+      padding-bottom: 5px;
+    }
+    .day-header.weekend { color: var(--red); }
+
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+    }
+    .cal-empty { min-height: 50px; }
+
+    .day-btn {
+      background: var(--cell); border: 1.5px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      cursor: pointer; padding: 7px 3px 5px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      transition: all 0.12s; min-height: 50px; outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .day-btn.today    { border-color: var(--green); }
+    .day-btn.selected { background: var(--green); border-color: var(--green); color: #1C1E22; }
+    .day-btn.has-hours { background: var(--hover); }
+    .day-btn.weekend  { color: var(--red); }
+    .day-btn.selected .day-num,
+    .day-btn.selected .day-h { color: #1C1E22 !important; }
+
+    .day-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; line-height: 1;
+    }
+    .day-num.bold { font-weight: 700; }
+    .day-h {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 600; line-height: 1;
+      color: var(--green);
+    }
+
+    /* Day input panel */
+    .day-input {
+      margin-top: 16px; background: var(--cell); border-radius: 12px;
+      padding: 14px 16px; border: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .day-input-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px; color: var(--subtle);
+    }
+    .day-input input {
+      background: var(--card); border: 1px solid var(--green);
+      border-radius: 8px; color: var(--green);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px; padding: 6px 10px; width: 80px;
+      outline: none; text-align: center;
+    }
+    .day-input-unit { color: var(--muted); font-size: 13px; }
+    .day-input-eq {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--green); font-size: 13px; margin-left: auto;
+    }
+    .day-input-btns { display: flex; gap: 8px; margin-left: auto; }
+
+    .btn-save {
+      background: var(--green); border: none; border-radius: 8px;
+      color: #1C1E22; font-weight: 700; font-size: 13px;
+      padding: 8px 16px; cursor: pointer; font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-cancel {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--subtle); font-size: 13px;
+      padding: 8px 16px; cursor: pointer; font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Summary */
+    .summary {
+      background: var(--card); border-radius: 16px; padding: 18px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3); margin-top: 16px;
+    }
+    .summary-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 14px;
+    }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat-card {
+      background: var(--cell); border-radius: 10px; padding: 11px 14px;
+      border: 1px solid transparent;
+    }
+    .stat-card.big { border-color: rgba(74,222,128,0.25); }
+    .stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px; font-weight: 500; color: var(--text);
+    }
+    .stat-value.green { color: var(--green); }
+    .stat-value.red   { color: var(--red); }
+    .stat-value.big   { font-size: 22px; font-weight: 700; }
+
+    .footer {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: #374151; margin-top: 20px; text-align: center;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <span class="label-sm">TOTALT INTJÄNAT</span>
+      <span class="save-status" id="saveStatus">·</span>
+    </div>
+    <div class="total-amount" id="totalAmount">0 kr</div>
+    <div class="total-sub" id="totalSub">0.0 h × 150 kr/h (alla månader)</div>
+  </div>
+
+  <!-- Rate -->
+  <div class="rate-row">
+    <label for="rateInput">Timlön (kr/h)</label>
+    <input type="number" id="rateInput" value="150" min="0" />
+    <span>kr</span>
+  </div>
+
+  <!-- Calendar -->
+  <div class="cal-card">
+    <div class="month-nav">
+      <button class="nav-btn" id="prevBtn">‹</button>
+      <span class="month-title" id="monthTitle"></span>
+      <button class="nav-btn" id="nextBtn">›</button>
+    </div>
+    <div class="day-headers" id="dayHeaders"></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="dayInputPanel" style="display:none;"></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="summary-title" id="summaryTitle"></div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Arbetade timmar</div>
+        <div class="stat-value" id="statHours">0.0 h</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Bruttolön</div>
+        <div class="stat-value green" id="statGross">0 kr</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Skatt (30%)</div>
+        <div class="stat-value red" id="statTax">–0 kr</div>
+      </div>
+      <div class="stat-card big">
+        <div class="stat-label">Nettolön</div>
+        <div class="stat-value green big" id="statNet">0 kr</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Klicka på en dag för att ange timmar<br>
+    Skatt beräknas schablonmässigt 30% · Data sparas lokalt
+  </div>
+</div>
+
+<script>
+  const MONTHS = ["Januari","Februari","Mars","April","Maj","Juni","Juli","Augusti","September","Oktober","November","December"];
+  const DAYS   = ["Mån","Tis","Ons","Tor","Fre","Lör","Sön"];
+
+  let year         = new Date().getFullYear();
+  let month        = new Date().getMonth();
+  let selectedDay  = null;
+  let hourlyRate   = 150;
+  let hours        = {};
+
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+
+  // --- Storage ---
+  function load() {
+    try {
+      const r = localStorage.getItem('arbetstid-rate');
+      const h = localStorage.getItem('arbetstid-hours');
+      if (r) hourlyRate = parseFloat(r) || 150;
+      if (h) hours = JSON.parse(h) || {};
+    } catch(e) {}
+    document.getElementById('rateInput').value = hourlyRate;
+  }
+
+  let saveTimer = null;
+  function save() {
+    clearTimeout(saveTimer);
+    showStatus('saving');
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem('arbetstid-hours', JSON.stringify(hours));
+        localStorage.setItem('arbetstid-rate', String(hourlyRate));
+        showStatus('saved');
+        setTimeout(() => showStatus('idle'), 1500);
+      } catch(e) {
+        showStatus('error');
+        setTimeout(() => showStatus('idle'), 2500);
+      }
+    }, 200);
+  }
+
+  function showStatus(s) {
+    const el = document.getElementById('saveStatus');
+    el.className = 'save-status ' + s;
+    el.textContent = s === 'saving' ? 'SPARAR…' : s === 'saved' ? '✓ SPARAT' : s === 'error' ? '! FEL' : '·';
+  }
+
+  // --- Format ---
+  function fmtSEK(n) {
+    return new Intl.NumberFormat('sv-SE', { style:'currency', currency:'SEK', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n);
+  }
+  function key(y, m, d) { return `${y}-${m}-${d}`; }
+
+  // --- Calendar ---
+  function render() {
+    // Month title
+    document.getElementById('monthTitle').textContent = `${MONTHS[month]} ${year}`;
+    document.getElementById('summaryTitle').textContent = `${MONTHS[month]} ${year} — Sammanfattning`;
+
+    // Day headers
+    const hdr = document.getElementById('dayHeaders');
+    hdr.innerHTML = '';
+    DAYS.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'day-header' + (i >= 5 ? ' weekend' : '');
+      el.textContent = d;
+      hdr.appendChild(el);
+    });
+
+    // Grid
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    const firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
+    const days = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstDow; i++) {
+      const el = document.createElement('div');
+      el.className = 'cal-empty';
+      grid.appendChild(el);
+    }
+
+    for (let d = 1; d <= days; d++) {
+      const k = key(year, month, d);
+      const h = parseFloat(hours[k] || 0);
+      const isToday   = k === todayKey;
+      const isSel     = selectedDay === d;
+      const dow       = new Date(year, month, d).getDay();
+      const isWE      = dow === 0 || dow === 6;
+      const hasHours  = h > 0;
+
+      const btn = document.createElement('button');
+      btn.className = 'day-btn' +
+        (isSel     ? ' selected'  : '') +
+        (isToday   ? ' today'     : '') +
+        (hasHours && !isSel ? ' has-hours' : '') +
+        (isWE && !isSel ? ' weekend' : '');
+
+      const numEl = document.createElement('span');
+      numEl.className = 'day-num' + (isToday ? ' bold' : '');
+      numEl.textContent = d;
+      btn.appendChild(numEl);
+
+      if (hasHours) {
+        const hEl = document.createElement('span');
+        hEl.className = 'day-h';
+        hEl.textContent = (h % 1 === 0 ? h : h.toFixed(1)) + 'h';
+        btn.appendChild(hEl);
+      }
+
+      btn.addEventListener('click', () => selectDay(d));
+      grid.appendChild(btn);
+    }
+
+    renderInputPanel();
+    renderSummary();
+    renderHeader();
+  }
+
+  function selectDay(d) {
+    selectedDay = (selectedDay === d) ? null : d;
+    render();
+    if (selectedDay !== null) {
+      setTimeout(() => {
+        const inp = document.getElementById('dayInputField');
+        if (inp) inp.focus();
+      }, 50);
+    }
+  }
+
+  function renderInputPanel() {
+    const panel = document.getElementById('dayInputPanel');
+    if (selectedDay === null) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+
+    const k = key(year, month, selectedDay);
+    const cur = hours[k] !== undefined ? String(hours[k]) : '';
+
+    panel.innerHTML = `
+      <div class="day-input">
+        <span class="day-input-label">${selectedDay} ${MONTHS[month]}</span>
+        <input id="dayInputField" type="text" inputmode="decimal" placeholder="0" value="${cur}" />
+        <span class="day-input-unit">timmar</span>
+        <span class="day-input-eq" id="dayEq"></span>
+        <div class="day-input-btns">
+          <button class="btn-cancel" id="cancelBtn">Avbryt</button>
+          <button class="btn-save" id="saveBtn">Spara</button>
+        </div>
+      </div>
+    `;
+
+    const inp = document.getElementById('dayInputField');
+    updateEq(inp.value);
+
+    inp.addEventListener('input', e => {
+      let v = e.target.value.replace(',', '.');
+      if (v !== '' && !/^\d*\.?\d*$/.test(v)) { e.target.value = v.slice(0,-1); return; }
+      e.target.value = v;
+      updateEq(v);
+    });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  commitSave();
+      if (e.key === 'Escape') { selectedDay = null; render(); }
+    });
+    document.getElementById('saveBtn').addEventListener('click', commitSave);
+    document.getElementById('cancelBtn').addEventListener('click', () => { selectedDay = null; render(); });
+  }
+
+  function updateEq(val) {
+    const eq = document.getElementById('dayEq');
+    if (!eq) return;
+    const n = parseFloat(val);
+    eq.textContent = (val && n > 0) ? '= ' + fmtSEK(n * hourlyRate) : '';
+  }
+
+  function commitSave() {
+    const inp = document.getElementById('dayInputField');
+    if (!inp) return;
+    const val = inp.value.replace(',', '.');
+    const parsed = parseFloat(val);
+    const k = key(year, month, selectedDay);
+    if (val === '' || isNaN(parsed) || parsed <= 0) {
+      delete hours[k];
+    } else {
+      hours[k] = Math.min(24, Math.max(0, parsed));
+    }
+    save();
+    selectedDay = null;
+    render();
+  }
+
+  function renderSummary() {
+    const days = new Date(year, month + 1, 0).getDate();
+    let total = 0;
+    for (let d = 1; d <= days; d++) total += parseFloat(hours[key(year, month, d)] || 0);
+    const gross = total * hourlyRate;
+    document.getElementById('statHours').textContent = total.toFixed(1) + ' h';
+    document.getElementById('statGross').textContent = fmtSEK(gross);
+    document.getElementById('statTax').textContent   = '–' + fmtSEK(gross * 0.3);
+    document.getElementById('statNet').textContent   = fmtSEK(gross * 0.7);
+  }
+
+  function renderHeader() {
+    const allH = Object.values(hours).reduce((s,v) => s + parseFloat(v||0), 0);
+    const allG = allH * hourlyRate;
+    document.getElementById('totalAmount').textContent = fmtSEK(allG);
+    document.getElementById('totalSub').textContent    = `${allH.toFixed(1)} h × ${hourlyRate} kr/h (alla månader)`;
+  }
+
+  // --- Events ---
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    if (month === 0) { month = 11; year--; } else month--;
+    selectedDay = null; render();
+  });
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    if (month === 11) { month = 0; year++; } else month++;
+    selectedDay = null; render();
+  });
+  document.getElementById('rateInput').addEventListener('input', e => {
+    hourlyRate = Math.max(0, parseFloat(e.target.value) || 0);
+    save();
+    render();
+  });
+
+  // --- Service Worker ---
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+
+  // --- Init ---
+  load();
+  render();
+</script>
+</body>
+</html>
